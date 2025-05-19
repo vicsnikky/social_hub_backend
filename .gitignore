@@ -1,0 +1,17 @@
+# Ignore virtual environments
+venv/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# Django collectstatic files
+/staticfiles/
+
+# SQLite database (optional if you're using PostgreSQL)
+*.sqlite3
