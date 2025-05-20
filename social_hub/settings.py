@@ -5,10 +5,12 @@ import dj_database_url
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$'
-
 import os
 SECRET_KEY = os.environ.get("soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$")
+
+
+SECRET_KEY = 'soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$'
+
 
 
 
