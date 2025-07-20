@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser
 from .serializers import UserSerializer
+from .serializers import PasswordResetRequestSerializer
 
 User = get_user_model()
 
@@ -104,3 +105,23 @@ class FollowingListView(generics.ListAPIView):
     def get_queryset(self):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.following for f in user.following_set.all()]
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+
+class RequestPasswordResetView(APIView):
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Password reset link sent"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+from .serializers import PasswordResetConfirmSerializer
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({"message": "Password has been reset successfully"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

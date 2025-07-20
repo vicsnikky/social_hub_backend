@@ -31,9 +31,12 @@ urlpatterns = [
     path("api/posts/", include("posts.urls")),
     path("api/jobs/", include("jobs.urls")),
     path("api/events/", include("events.urls")),
+    path('api/chat/', include('chat.urls')),
+
     #  Swagger and ReDoc API docs
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    
 ]
 
 #  Media files handling in development

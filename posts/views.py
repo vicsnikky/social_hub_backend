@@ -71,4 +71,25 @@ class CommentDeleteView(generics.DestroyAPIView):
         if comment.user != request.user:
             return Response({'error': 'You can only delete your own comment.'}, status=403)
         return super().delete(request, *args, **kwargs)
+from rest_framework import generics, permissions
+from .models import Post
+from .serializers import PostSerializer
+from users.models import CustomUser
+from django.shortcuts import get_object_or_404
 
+class PostsByUserView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if you want to restrict
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        user = get_object_or_404(CustomUser, id=user_id)
+        return Post.objects.filter(user=user).order_by('-created_at')
+
+class PostSearchView(generics.ListAPIView):
+    serializer_class = PostSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        query = self.request.query_params.get('q', '')
+        return Post.objects.filter(content__icontains=query).order_by('-created_at')

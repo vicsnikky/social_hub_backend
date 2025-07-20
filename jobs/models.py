@@ -13,6 +13,7 @@ class Job(models.Model):
     deadline = models.DateField()
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    interested_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='interested_jobs', blank=True)
 
     def __str__(self):
         return f"{self.title} at {self.company_name}"
