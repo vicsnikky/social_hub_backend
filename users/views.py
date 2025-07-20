@@ -47,3 +47,60 @@ class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+from rest_framework import generics, permissions, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from .models import CustomUser, UserFollow
+from .serializers import UserSerializer
+
+# List all users
+class UserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+# Retrieve user by ID
+class UserDetailView(generics.RetrieveAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+# Follow/Unfollow user
+class FollowUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, id):
+        target = get_object_or_404(CustomUser, id=id)
+        if request.user == target:
+            return Response({"error": "You cannot follow yourself."}, status=400)
+
+        follow, created = UserFollow.objects.get_or_create(
+            follower=request.user,
+            following=target
+        )
+        if not created:
+            follow.delete()
+            return Response({"message": "Unfollowed"}, status=200)
+        return Response({"message": "Followed"}, status=201)
+
+# Followers list
+class FollowersListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = get_object_or_404(CustomUser, id=self.kwargs['id'])
+        return [f.follower for f in user.followers_set.all()]
+
+# Following list
+class FollowingListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = get_object_or_404(CustomUser, id=self.kwargs['id'])
+        return [f.following for f in user.following_set.all()]
