@@ -6,7 +6,8 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ✅ Secret key (secure fallback)
-SECRET_KEY = os.environ.get('soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$')
+SECRET_KEY = os.environ.get("SECRET_KEY",'soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$')
+
 
 # ✅ Debug mode - set to False on production
 DEBUG = True
