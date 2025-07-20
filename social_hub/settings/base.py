@@ -2,23 +2,19 @@ import os
 from pathlib import Path
 import dj_database_url
 
-# Base directory
+# ✅ Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-import os
-SECRET_KEY = os.environ.get("soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$")
+# ✅ Secret key (secure fallback)
+SECRET_KEY = os.environ.get("SECRET_KEY", 'soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$')
 
-
-SECRET_KEY = 'soyz@lyzxsvw#w-&x7@=))nv0vlt0(qjad3y4o040fclchwyu$'
-
-
-
-
+# ✅ Debug mode - set to False on production
 DEBUG = True
 
-ALLOWED_HOSTS = ['.onrender.com']
+# ✅ Allowed hosts
+ALLOWED_HOSTS = ['.onrender.com', 'localhost', '127.0.0.1']
 
-#  Essential Installed Apps
+# ✅ Installed apps
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -27,26 +23,25 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Custom apps
-    
+    # Third-party
+    'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_yasg',
-    'users', 
+
+    # Custom apps
+    'users',
     'posts',
     'jobs',
     'events',
     'chat',
-    
-
-
 ]
 
-#  Middleware
+# ✅ Middleware
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Make sure this is first
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -55,7 +50,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-#  Database (PostgreSQL Config)
+# ✅ Database
 DATABASES = {
     'default': dj_database_url.config(
         default='postgresql://postgres:postgres@localhost:5432/social_hub_db',
@@ -63,7 +58,17 @@ DATABASES = {
     )
 }
 
-#  Required for Password Validation
+# ✅ Auth user model
+AUTH_USER_MODEL = 'users.CustomUser'
+
+# ✅ REST framework
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+# ✅ Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -71,20 +76,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Static & Media Files
+# ✅ Static & media files
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Default Primary Key Field Type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# TEMPLATES Configuration (Required for Django Admin)
+# ✅ Templates
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],  # You can create a 'templates' folder in your project
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -97,19 +101,10 @@ TEMPLATES = [
     },
 ]
 
-ROOT_URLCONF = "social_hub.urls" 
-AUTH_USER_MODEL = 'users.CustomUser'
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-}
+ROOT_URLCONF = "social_hub.urls"
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-import os
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+# ✅ Swagger config
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {
@@ -119,14 +114,8 @@ SWAGGER_SETTINGS = {
             'description': 'JWT Authorization header using the Bearer scheme. Example: "Bearer <token>"',
         }
     },
-    'USE_SESSION_AUTH': False,  #  Disable default login/password prompt
+    'USE_SESSION_AUTH': False,
 }
 
-
-INSTALLED_APPS += ['corsheaders']
-
-MIDDLEWARE = ['corsheaders.middleware.CorsMiddleware'] + MIDDLEWARE
-
-CORS_ALLOW_ALL_ORIGINS = True  # or restrict to frontend URL
-
-
+# ✅ CORS settings
+CORS_ALLOW_ALL_ORIGINS = True
