@@ -1,20 +1,25 @@
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status, permissions
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import CustomUser
-from .serializers import UserSerializer
-from .serializers import PasswordResetRequestSerializer
+
+from .models import CustomUser, UserFollow
+from .serializers import (
+    UserSerializer,
+    PasswordResetSerializer,
+)
 
 User = get_user_model()
 
-# Signup View
+# ---------- AUTH & PROFILE VIEWS ----------
+
 class UserSignupView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-#  Login View (JWT)
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
@@ -32,7 +37,6 @@ class UserLoginView(generics.GenericAPIView):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-#  View Profile
 class UserProfileView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -40,7 +44,6 @@ class UserProfileView(generics.RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
-# Update Profile (bio, profile_pic)
 class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -49,28 +52,18 @@ class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
+# ---------- USER LIST & FOLLOW VIEWS ----------
 
-from rest_framework import generics, permissions, status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-
-from .models import CustomUser, UserFollow
-from .serializers import UserSerializer
-
-# List all users
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-# Retrieve user by ID
 class UserDetailView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-# Follow/Unfollow user
 class FollowUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -88,7 +81,6 @@ class FollowUserView(APIView):
             return Response({"message": "Unfollowed"}, status=200)
         return Response({"message": "Followed"}, status=201)
 
-# Followers list
 class FollowersListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -97,7 +89,6 @@ class FollowersListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.follower for f in user.followers_set.all()]
 
-# Following list
 class FollowingListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -106,22 +97,14 @@ class FollowingListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.following for f in user.following_set.all()]
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+# ---------- PASSWORD RESET (Token-less) ----------
 
-class RequestPasswordResetView(APIView):
+class PasswordResetView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
-        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Password reset link sent"}, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-from .serializers import PasswordResetConfirmSerializer
-
-class PasswordResetConfirmView(APIView):
-    def post(self, request):
-        serializer = PasswordResetConfirmSerializer(data=request.data)
-        if serializer.is_valid():
-            return Response({"message": "Password has been reset successfully"}, status=status.HTTP_200_OK)
+            return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

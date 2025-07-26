@@ -11,6 +11,7 @@ from .views import (
     FollowingListView, 
     RequestPasswordResetView,
     PasswordResetConfirmView,
+    PasswordResetView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -34,6 +35,6 @@ urlpatterns = [
     path('<int:id>/following/', FollowingListView.as_view(), name='following-list'),
 
     # Password Reset
-    path('forgot-password/', RequestPasswordResetView.as_view(), name='forgot-password'),
+    path('forgot-password/', PasswordResetView.as_view(), name='forgot_password'),
     path('reset-password/', PasswordResetConfirmView.as_view(), name='reset-password'),
 ]
