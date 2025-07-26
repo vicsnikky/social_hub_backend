@@ -9,32 +9,30 @@ from .views import (
     FollowUserView, 
     FollowersListView, 
     FollowingListView, 
-    RequestPasswordResetView,
-    PasswordResetConfirmView,
     PasswordResetView,
+    PasswordResetView,  # Only this one is used now
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
-    # Authentication Endpoints
+    # Authentication
     path('signup/', UserSignupView.as_view(), name='signup'),
     path('login/', UserLoginView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    # Profile Endpoints
+    # Profile
     path('profile/', UserProfileView.as_view(), name='profile'),
     path('profile/update/', UserProfileUpdateView.as_view(), name='profile-update'),
 
-    # User Listings
+    # Users
     path('', UserListView.as_view(), name='user-list'),
     path('<int:pk>/', UserDetailView.as_view(), name='user-detail'),
 
-    # Social (Follow) Endpoints
+    # Follow
     path('<int:id>/follow/', FollowUserView.as_view(), name='follow-user'),
     path('<int:id>/followers/', FollowersListView.as_view(), name='followers-list'),
     path('<int:id>/following/', FollowingListView.as_view(), name='following-list'),
 
-    # Password Reset
-    path('forgot-password/', PasswordResetView.as_view(), name='forgot_password'),
-    path('reset-password/', PasswordResetConfirmView.as_view(), name='reset-password'),
+    # Password reset (token-less)
+    path('forgot-password/', PasswordResetView.as_view(), name='forgot-password'),
 ]
