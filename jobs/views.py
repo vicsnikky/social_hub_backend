@@ -8,7 +8,7 @@ from .serializers import JobSerializer
 from users.models import CustomUser
 
 
-# ✅ List and Create Jobs
+# ---------- LIST & CREATE ----------
 class JobListCreateView(generics.ListCreateAPIView):
     queryset = Job.objects.all().order_by('-created_at')
     serializer_class = JobSerializer
@@ -18,7 +18,7 @@ class JobListCreateView(generics.ListCreateAPIView):
         serializer.save(created_by=self.request.user)
 
 
-# ✅ Retrieve and Delete Job
+# ---------- RETRIEVE & DELETE ----------
 class JobRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
@@ -31,18 +31,17 @@ class JobRetrieveDestroyView(generics.RetrieveDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-# ✅ Get Jobs by User ID (🔧 FIXED FIELD ERROR)
+# ---------- JOBS BY USER ----------
 class JobsByUserView(generics.ListAPIView):
     serializer_class = JobSerializer
-    permission_classes = [permissions.AllowAny]  # Adjust if needed
+    permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated if needed
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        user = get_object_or_404(CustomUser, id=user_id)
-        return Job.objects.filter(created_by=user).order_by('-created_at')
+        return Job.objects.filter(created_by_id=user_id).order_by('-created_at')
 
 
-# ✅ Show/Remove Interest in Job
+# ---------- SHOW/REMOVE INTEREST ----------
 class JobInterestView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -56,7 +55,7 @@ class JobInterestView(APIView):
             return Response({"message": "Interest shown"}, status=status.HTTP_201_CREATED)
 
 
-# ✅ Get Job Applicant Count
+# ---------- JOB APPLICANT COUNT ----------
 class JobApplicantStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -66,7 +65,7 @@ class JobApplicantStatsView(APIView):
         return Response({"job_id": job_id, "applicants_count": total_applicants})
 
 
-# ✅ Search for Jobs
+# ---------- SEARCH JOBS ----------
 class JobSearchView(generics.ListAPIView):
     serializer_class = JobSerializer
     permission_classes = [permissions.AllowAny]

@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -6,10 +6,10 @@ from rest_framework.permissions import IsAuthenticated
 
 from .models import Event
 from .serializers import EventSerializer
-from users.models import CustomUser
+from users.serializers import UserSerializer
 
 
-# ✅ Create and List Events
+# ---------- CREATE & LIST ----------
 class EventListCreateView(generics.ListCreateAPIView):
     queryset = Event.objects.all().order_by('-start_time')
     serializer_class = EventSerializer
@@ -19,7 +19,7 @@ class EventListCreateView(generics.ListCreateAPIView):
         serializer.save(created_by=self.request.user)
 
 
-# ✅ Retrieve and Delete Event
+# ---------- RETRIEVE & DELETE ----------
 class EventRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
@@ -32,18 +32,17 @@ class EventRetrieveDestroyView(generics.RetrieveDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-# ✅ Get Events by User ID
+# ---------- EVENTS BY USER ----------
 class EventsByUserView(generics.ListAPIView):
     serializer_class = EventSerializer
-    permission_classes = [permissions.AllowAny]  # Or IsAuthenticated if needed
+    permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated if needed
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        user = get_object_or_404(CustomUser, id=user_id)
-        return Event.objects.filter(created_by=user).order_by('-created_at')
+        return Event.objects.filter(created_by_id=user_id).order_by('-created_at')
 
 
-# ✅ Toggle Event Interest
+# ---------- TOGGLE INTEREST ----------
 class EventInterestView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -56,6 +55,8 @@ class EventInterestView(APIView):
             event.interested_users.add(request.user)
             return Response({"message": "Interest shown"}, status=status.HTTP_201_CREATED)
 
+
+# ---------- ATTENDEE STATS ----------
 class EventAttendeeStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -64,8 +65,8 @@ class EventAttendeeStatsView(APIView):
         total_attendees = event.interested_users.count()
         return Response({"event_id": event_id, "attendees_count": total_attendees})
 
-from users.serializers import UserSerializer  # To serialize attendee data
 
+# ---------- ATTENDEE LIST ----------
 class EventAttendeesListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -74,6 +75,9 @@ class EventAttendeesListView(generics.ListAPIView):
         event_id = self.kwargs['event_id']
         event = get_object_or_404(Event, id=event_id)
         return event.interested_users.all()
+
+
+# ---------- SEARCH EVENTS ----------
 class EventSearchView(generics.ListAPIView):
     serializer_class = EventSerializer
     permission_classes = [permissions.AllowAny]

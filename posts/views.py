@@ -1,8 +1,14 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 
-from rest_framework import generics, permissions
-from .models import Post
-from .serializers import PostSerializer
+from .models import Post, Like, Comment
+from .serializers import PostSerializer, CommentSerializer
+from users.models import CustomUser
+
+
+# ---------- POSTS CRUD ----------
 
 class PostListCreateView(generics.ListCreateAPIView):
     queryset = Post.objects.all().order_by('-created_at')
@@ -11,6 +17,7 @@ class PostListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
 
 class PostRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = Post.objects.all()
@@ -23,11 +30,8 @@ class PostRetrieveDestroyView(generics.RetrieveDestroyAPIView):
             return Response({'error': 'You can only delete your own posts.'}, status=403)
         return super().delete(request, *args, **kwargs)
 
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
 
-from .models import Post, Like
+# ---------- LIKE POST ----------
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -46,8 +50,7 @@ def like_post(request, pk):
     return Response({'message': 'Post liked.'}, status=status.HTTP_201_CREATED)
 
 
-from .models import Comment
-from .serializers import CommentSerializer
+# ---------- COMMENTS ----------
 
 class CommentListCreateView(generics.ListCreateAPIView):
     serializer_class = CommentSerializer
@@ -61,6 +64,7 @@ class CommentListCreateView(generics.ListCreateAPIView):
         post_id = self.kwargs['post_id']
         serializer.save(user=self.request.user, post_id=post_id)
 
+
 class CommentDeleteView(generics.DestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -71,20 +75,20 @@ class CommentDeleteView(generics.DestroyAPIView):
         if comment.user != request.user:
             return Response({'error': 'You can only delete your own comment.'}, status=403)
         return super().delete(request, *args, **kwargs)
-from rest_framework import generics, permissions
-from .models import Post
-from .serializers import PostSerializer
-from users.models import CustomUser
-from django.shortcuts import get_object_or_404
+
+
+# ---------- POSTS BY USER ----------
 
 class PostsByUserView(generics.ListAPIView):
     serializer_class = PostSerializer
-    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if you want to restrict
+    permission_classes = [permissions.AllowAny]  # change to IsAuthenticated if needed
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        user = get_object_or_404(CustomUser, id=user_id)
-        return Post.objects.filter(user=user).order_by('-created_at')
+        return Post.objects.filter(author_id=user_id).order_by('-created_at')
+
+
+# ---------- SEARCH POSTS ----------
 
 class PostSearchView(generics.ListAPIView):
     serializer_class = PostSerializer
