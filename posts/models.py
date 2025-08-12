@@ -3,10 +3,12 @@ from django.conf import settings
 
 class Post(models.Model):
     author = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='posts'
     )
     content = models.TextField()
-    image = models.ImageField(upload_to='post_images/', blank=True, null=True)
+    media = models.FileField(upload_to='post_media/', blank=True, null=True)  # Image/Video/File
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -23,7 +25,7 @@ class Like(models.Model):
 
     def __str__(self):
         return f"{self.user.username} liked {self.post.id}"
-    
+
 
 class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
@@ -33,4 +35,3 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"{self.user.username} commented on post {self.post.id}"
-
