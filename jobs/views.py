@@ -7,8 +7,7 @@ from .models import Job
 from .serializers import JobSerializer
 from users.models import CustomUser
 
-
-# ---------- LIST & CREATE ----------
+# ✅ List & Create Jobs
 class JobListCreateView(generics.ListCreateAPIView):
     queryset = Job.objects.all().order_by('-created_at')
     serializer_class = JobSerializer
@@ -17,31 +16,34 @@ class JobListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-
-# ---------- RETRIEVE & DELETE ----------
-class JobRetrieveDestroyView(generics.RetrieveDestroyAPIView):
+# ✅ Retrieve, Update (Edit) & Delete Job
+class JobRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Job.objects.all()
     serializer_class = JobSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def delete(self, request, *args, **kwargs):
+    def perform_update(self, serializer):
         job = self.get_object()
-        if job.created_by != request.user:
-            return Response({'error': 'You can only delete your own job post.'}, status=403)
-        return super().delete(request, *args, **kwargs)
+        if job.created_by != self.request.user:
+            return Response({'error': 'You can only edit your own job post.'}, status=status.HTTP_403_FORBIDDEN)
+        serializer.save()
 
+    def perform_destroy(self, instance):
+        if instance.created_by != self.request.user:
+            return Response({'error': 'You can only delete your own job post.'}, status=status.HTTP_403_FORBIDDEN)
+        instance.delete()
 
-# ---------- JOBS BY USER ----------
+# ✅ Get Jobs by User ID
 class JobsByUserView(generics.ListAPIView):
     serializer_class = JobSerializer
     permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated if needed
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        return Job.objects.filter(created_by_id=user_id).order_by('-created_at')
+        user = get_object_or_404(CustomUser, id=user_id)
+        return Job.objects.filter(created_by=user).order_by('-created_at')
 
-
-# ---------- SHOW/REMOVE INTEREST ----------
+# ✅ Show/Remove Interest in Job
 class JobInterestView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -54,8 +56,7 @@ class JobInterestView(APIView):
             job.interested_users.add(request.user)
             return Response({"message": "Interest shown"}, status=status.HTTP_201_CREATED)
 
-
-# ---------- JOB APPLICANT COUNT ----------
+# ✅ Get Job Applicant Count
 class JobApplicantStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -64,8 +65,7 @@ class JobApplicantStatsView(APIView):
         total_applicants = job.interested_users.count()
         return Response({"job_id": job_id, "applicants_count": total_applicants})
 
-
-# ---------- SEARCH JOBS ----------
+# ✅ Search Jobs
 class JobSearchView(generics.ListAPIView):
     serializer_class = JobSerializer
     permission_classes = [permissions.AllowAny]

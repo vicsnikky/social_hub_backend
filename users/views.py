@@ -4,28 +4,34 @@ from rest_framework import generics, status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.exceptions import PermissionDenied
 
 from .models import CustomUser, UserFollow
 from .serializers import UserSerializer, PasswordResetSerializer
 
 User = get_user_model()
 
-# ---------- AUTH & PROFILE ----------
+# Retrieve all users
+class UserListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
 
+# Signup
 class UserSignupView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-class UserLoginView(APIView):
+# Login
+class UserLoginView(generics.GenericAPIView):
+    serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
+    def post(self, request, *args, **kwargs):
         try:
-            user = User.objects.get(username=username)
-            if user.check_password(password):
+            user = User.objects.get(username=request.data['username'])
+            if user.check_password(request.data['password']):
                 refresh = RefreshToken.for_user(user)
                 return Response({
                     'refresh': str(refresh),
@@ -35,6 +41,7 @@ class UserLoginView(APIView):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
+# View Profile
 class UserProfileView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -42,27 +49,22 @@ class UserProfileView(generics.RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
+# Update Profile
 class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
+    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
 
-# ---------- USER DIRECTORY ----------
-
-class UserListView(generics.ListAPIView):
-    queryset = CustomUser.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
+# Retrieve user by ID
 class UserDetailView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-# ---------- FOLLOW SYSTEM ----------
-
+# Follow / Unfollow
 class FollowUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -71,12 +73,16 @@ class FollowUserView(APIView):
         if request.user == target:
             return Response({"error": "You cannot follow yourself."}, status=400)
 
-        follow, created = UserFollow.objects.get_or_create(follower=request.user, following=target)
+        follow, created = UserFollow.objects.get_or_create(
+            follower=request.user,
+            following=target
+        )
         if not created:
             follow.delete()
             return Response({"message": "Unfollowed"}, status=200)
         return Response({"message": "Followed"}, status=201)
 
+# Followers list
 class FollowersListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -85,6 +91,7 @@ class FollowersListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.follower for f in user.followers_set.all()]
 
+# Following list
 class FollowingListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -93,8 +100,7 @@ class FollowingListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.following for f in user.following_set.all()]
 
-# ---------- PASSWORD RESET ----------
-
+# Password Reset (No Token)
 class PasswordResetView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -102,5 +108,5 @@ class PasswordResetView(APIView):
         serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
+            return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

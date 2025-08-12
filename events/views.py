@@ -2,14 +2,15 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Event
 from .serializers import EventSerializer
+from users.models import CustomUser
 from users.serializers import UserSerializer
 
-
-# ---------- CREATE & LIST ----------
+# Create & list events
 class EventListCreateView(generics.ListCreateAPIView):
     queryset = Event.objects.all().order_by('-start_time')
     serializer_class = EventSerializer
@@ -18,31 +19,34 @@ class EventListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-
-# ---------- RETRIEVE & DELETE ----------
-class EventRetrieveDestroyView(generics.RetrieveDestroyAPIView):
+# Retrieve, update (edit), delete event
+class EventRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def delete(self, request, *args, **kwargs):
+    def perform_update(self, serializer):
         event = self.get_object()
-        if event.created_by != request.user:
-            return Response({'error': 'You can only delete your own event.'}, status=status.HTTP_403_FORBIDDEN)
-        return super().delete(request, *args, **kwargs)
+        if event.created_by != self.request.user:
+            raise PermissionDenied("You can only edit your own event.")
+        serializer.save()
 
+    def perform_destroy(self, instance):
+        if instance.created_by != self.request.user:
+            raise PermissionDenied("You can only delete your own event.")
+        instance.delete()
 
-# ---------- EVENTS BY USER ----------
+# Get events by user
 class EventsByUserView(generics.ListAPIView):
     serializer_class = EventSerializer
-    permission_classes = [permissions.AllowAny]  # Change to IsAuthenticated if needed
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        return Event.objects.filter(created_by_id=user_id).order_by('-created_at')
+        user = get_object_or_404(CustomUser, id=user_id)
+        return Event.objects.filter(created_by=user).order_by('-created_at')
 
-
-# ---------- TOGGLE INTEREST ----------
+# Toggle interest in event
 class EventInterestView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -55,8 +59,7 @@ class EventInterestView(APIView):
             event.interested_users.add(request.user)
             return Response({"message": "Interest shown"}, status=status.HTTP_201_CREATED)
 
-
-# ---------- ATTENDEE STATS ----------
+# Attendee stats
 class EventAttendeeStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -65,8 +68,7 @@ class EventAttendeeStatsView(APIView):
         total_attendees = event.interested_users.count()
         return Response({"event_id": event_id, "attendees_count": total_attendees})
 
-
-# ---------- ATTENDEE LIST ----------
+# Attendees list
 class EventAttendeesListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -76,8 +78,7 @@ class EventAttendeesListView(generics.ListAPIView):
         event = get_object_or_404(Event, id=event_id)
         return event.interested_users.all()
 
-
-# ---------- SEARCH EVENTS ----------
+# Search events
 class EventSearchView(generics.ListAPIView):
     serializer_class = EventSerializer
     permission_classes = [permissions.AllowAny]
