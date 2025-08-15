@@ -4,9 +4,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 
-from .models import Post, Like, Comment
-from .serializers import PostSerializer, CommentSerializer, LikeSerializer
-from users.serializers import UserSerializer
+from .models import Post, Comment
+from .serializers import PostSerializer, CommentSerializer
+from users.models import CustomUser
+
 
 # ✅ List & Create Posts
 class PostListCreateView(generics.ListCreateAPIView):
@@ -22,7 +23,8 @@ class PostListCreateView(generics.ListCreateAPIView):
         ctx.update({'request': self.request})
         return ctx
 
-# ✅ Retrieve, Update (Edit), Delete Post
+
+# ✅ Retrieve, Update, Delete Post
 class PostRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
@@ -44,38 +46,33 @@ class PostRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         ctx.update({'request': self.request})
         return ctx
 
-# ✅ Get Author’s Avatar for a Post
-class PostAuthorAvatarView(APIView):
-    permission_classes = [permissions.AllowAny]
 
-    def get(self, request, pk):
-        post = get_object_or_404(Post, pk=pk)
-        author = post.author
-        avatar_url = request.build_absolute_uri(author.profile_pic.url) if author.profile_pic else None
-        return Response({
-            "author_id": author.id,
-            "username": author.username,
-            "avatar": avatar_url
-        })
-
-# ✅ Like/Unlike Post & List Likes
+# ✅ Like / Unlike Post & Get Likes
 class PostLikeToggleView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
-        like, created = Like.objects.get_or_create(user=request.user, post=post)
-        if not created:
-            like.delete()
+        if request.user in post.liked_by.all():
+            post.liked_by.remove(request.user)
             return Response({'message': 'Post unliked.'}, status=status.HTTP_200_OK)
-        serializer = LikeSerializer(like, context={'request': request})
-        return Response({'message': 'Post liked.', 'like': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            post.liked_by.add(request.user)
+            return Response({'message': 'Post liked.'}, status=status.HTTP_201_CREATED)
 
     def get(self, request, pk):
         post = get_object_or_404(Post, pk=pk)
-        likes_qs = post.like_set.select_related('user').all()
-        serializer = LikeSerializer(likes_qs, many=True, context={'request': request})
-        return Response({'count': likes_qs.count(), 'likes': serializer.data}, status=status.HTTP_200_OK)
+        likes_qs = post.liked_by.all()
+        data = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'avatar': request.build_absolute_uri(user.avatar.url) if getattr(user, 'avatar', None) else None
+            }
+            for user in likes_qs
+        ]
+        return Response({'count': likes_qs.count(), 'likes': data}, status=status.HTTP_200_OK)
+
 
 # ✅ Comments: List & Create
 class CommentListCreateView(generics.ListCreateAPIView):
@@ -90,7 +87,8 @@ class CommentListCreateView(generics.ListCreateAPIView):
         post_id = self.kwargs['post_id']
         serializer.save(user=self.request.user, post_id=post_id)
 
-# ✅ Retrieve & Delete Comment
+
+# ✅ Comment: Retrieve & Delete
 class CommentRetrieveDestroyView(generics.RetrieveDestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -101,35 +99,33 @@ class CommentRetrieveDestroyView(generics.RetrieveDestroyAPIView):
             raise PermissionDenied("You can only delete your own comment.")
         instance.delete()
 
-# ✅ Like/Unlike Comment & List Likes
+
+# ✅ Like / Unlike Comment & Get Likes
 class CommentLikeToggleView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
         comment = get_object_or_404(Comment, pk=pk)
-        if hasattr(comment, 'liked_by'):
-            if request.user in comment.liked_by.all():
-                comment.liked_by.remove(request.user)
-                return Response({'message': 'Comment unliked.'}, status=status.HTTP_200_OK)
-            else:
-                comment.liked_by.add(request.user)
-                return Response({'message': 'Comment liked.'}, status=status.HTTP_201_CREATED)
-        return Response({'error': 'Comment like feature not configured in models.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if request.user in comment.liked_by.all():
+            comment.liked_by.remove(request.user)
+            return Response({'message': 'Comment unliked.'}, status=status.HTTP_200_OK)
+        else:
+            comment.liked_by.add(request.user)
+            return Response({'message': 'Comment liked.'}, status=status.HTTP_201_CREATED)
 
     def get(self, request, pk):
         comment = get_object_or_404(Comment, pk=pk)
-        if hasattr(comment, 'liked_by'):
-            users = comment.liked_by.all()
-            data = [
-                {
-                    'id': u.id,
-                    'username': u.username,
-                    'avatar': request.build_absolute_uri(u.profile_pic.url) if u.profile_pic else None
-                }
-                for u in users
-            ]
-            return Response({'count': users.count(), 'users': data}, status=status.HTTP_200_OK)
-        return Response({'error': 'Comment like feature not configured in models.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        likes_qs = comment.liked_by.all()
+        data = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'avatar': request.build_absolute_uri(user.avatar.url) if getattr(user, 'avatar', None) else None
+            }
+            for user in likes_qs
+        ]
+        return Response({'count': likes_qs.count(), 'likes': data}, status=status.HTTP_200_OK)
+
 
 # ✅ Posts by User
 class PostsByUserView(generics.ListAPIView):
@@ -138,7 +134,9 @@ class PostsByUserView(generics.ListAPIView):
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        return Post.objects.filter(author_id=user_id).order_by('-created_at')
+        user = get_object_or_404(CustomUser, id=user_id)
+        return Post.objects.filter(author=user).order_by('-created_at')
+
 
 # ✅ Search Posts
 class PostSearchView(generics.ListAPIView):
