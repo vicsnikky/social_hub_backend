@@ -110,3 +110,12 @@ class PasswordResetView(APIView):
             serializer.save()
             return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework import generics, permissions
+from .models import CustomUser
+from .serializers import UserSerializer
+
+class AllUsersListView(generics.ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if you want to restrict
