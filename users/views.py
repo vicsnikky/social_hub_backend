@@ -5,6 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import PermissionDenied
+from .serializers import UserSerializer, LoginSerializer 
+
 
 from .models import CustomUser, UserFollow
 from .serializers import UserSerializer, PasswordResetSerializer
@@ -25,21 +27,41 @@ class UserSignupView(generics.CreateAPIView):
 
 # Login
 class UserLoginView(generics.GenericAPIView):
-    serializer_class = UserSerializer
+    serializer_class = LoginSerializer   # 👈 use the new serializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
+        username_or_email = request.data.get("username")
+        password = request.data.get("password")
+
+        if not username_or_email or not password:
+            return Response(
+                {"error": "Username/Email and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-            user = User.objects.get(username=request.data['username'])
-            if user.check_password(request.data['password']):
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                })
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+            user = User.objects.get(username=username_or_email)
         except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            try:
+                user = User.objects.get(email=username_or_email)
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.check_password(password):
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+            }
+        })
+
 
 # View Profile
 class UserProfileView(generics.RetrieveAPIView):

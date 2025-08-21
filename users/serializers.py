@@ -43,3 +43,12 @@ class PasswordResetSerializer(serializers.Serializer):
         user.password = make_password(new_password)
         user.save()
         return user
+
+from rest_framework import serializers
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(
+        help_text="Enter either your username OR email",
+        required=True
+    )
+    password = serializers.CharField(write_only=True, required=True)
