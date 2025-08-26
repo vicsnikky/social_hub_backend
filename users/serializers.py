@@ -20,11 +20,23 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
     def get_avatar(self, obj):
-        # assumes your CustomUser model has `profile_pic`
         request = self.context.get("request")
         if hasattr(obj, "profile_pic") and obj.profile_pic:
             return request.build_absolute_uri(obj.profile_pic.url) if request else obj.profile_pic.url
         return None
+
+
+# ✅ Signup serializer
+class UserSignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "password", "first_name", "last_name"]
+
+    def create(self, validated_data):
+        validated_data["password"] = make_password(validated_data["password"])  # 🔑 hash password
+        return super().create(validated_data)
 
 
 class PasswordResetSerializer(serializers.Serializer):
@@ -40,11 +52,10 @@ class PasswordResetSerializer(serializers.Serializer):
         email = self.validated_data["email"]
         new_password = self.validated_data["new_password"]
         user = User.objects.get(email=email)
-        user.password = make_password(new_password)
+        user.password = make_password(new_password)  # hash reset password
         user.save()
         return user
 
-from rest_framework import serializers
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(
