@@ -20,7 +20,7 @@ class UserListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
 # Signup
-from .serializers import UserSignupSerializer  
+from .serializers import UserSerializer, UserSignupSerializer, LoginSerializer, PasswordResetSerializer  
 
 class UserSignupView(generics.CreateAPIView):
     queryset = User.objects.all()
