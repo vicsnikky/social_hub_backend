@@ -12,6 +12,13 @@ class Post(models.Model):
     media = models.FileField(upload_to="post_media/", blank=True, null=True)  # supports image/video
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # ✅ ManyToMany for likes on posts
+    liked_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="liked_posts",
+        blank=True
+    )
+
     def __str__(self):
         return f"{self.author.username} - {self.content[:30]}"
 

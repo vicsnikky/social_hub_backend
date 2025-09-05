@@ -16,9 +16,12 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
-            "avatar",
+            "bio",          
+            "profile_pic",  
+            "avatar", 
         ]
 
+        read_only_fields = ["id", "avatar"]
     def get_avatar(self, obj):
         request = self.context.get("request")
         if hasattr(obj, "profile_pic") and obj.profile_pic:
