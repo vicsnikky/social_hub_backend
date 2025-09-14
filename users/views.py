@@ -5,31 +5,29 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import PermissionDenied
-from .serializers import UserSerializer, LoginSerializer 
-
 
 from .models import CustomUser, UserFollow
-from .serializers import UserSerializer, PasswordResetSerializer
+from .serializers import UserSerializer, PasswordResetSerializer, LoginSerializer
 
 User = get_user_model()
 
-# Retrieve all users
+# ✅ Retrieve all users
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-# Signup
-from .serializers import UserSerializer, UserSignupSerializer, LoginSerializer, PasswordResetSerializer  
 
+# ✅ Signup
 class UserSignupView(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSignupSerializer
+    serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-# Login
+
+# ✅ Login (username or email)
 class UserLoginView(generics.GenericAPIView):
-    serializer_class = LoginSerializer   # 👈 use the new serializer
+    serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -57,15 +55,11 @@ class UserLoginView(generics.GenericAPIView):
         return Response({
             "refresh": str(refresh),
             "access": str(refresh.access_token),
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-            }
+            "user": UserSerializer(user, context={"request": request}).data
         })
 
 
-# View Profile
+# ✅ View Profile (logged in user)
 class UserProfileView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -73,7 +67,8 @@ class UserProfileView(generics.RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
-# Update Profile
+
+# ✅ Update Profile (bio + profile picture + other fields)
 class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -82,13 +77,15 @@ class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
-# Retrieve user by ID
+
+# ✅ Retrieve user by ID
 class UserDetailView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-# Follow / Unfollow
+
+# ✅ Follow / Unfollow
 class FollowUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -106,7 +103,8 @@ class FollowUserView(APIView):
             return Response({"message": "Unfollowed"}, status=200)
         return Response({"message": "Followed"}, status=201)
 
-# Followers list
+
+# ✅ Followers list
 class FollowersListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -115,7 +113,8 @@ class FollowersListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.follower for f in user.followers_set.all()]
 
-# Following list
+
+# ✅ Following list
 class FollowingListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -124,7 +123,8 @@ class FollowingListView(generics.ListAPIView):
         user = get_object_or_404(CustomUser, id=self.kwargs['id'])
         return [f.following for f in user.following_set.all()]
 
-# Password Reset (No Token)
+
+# ✅ Password Reset (No Token)
 class PasswordResetView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -135,11 +135,9 @@ class PasswordResetView(APIView):
             return Response({"message": "Password has been reset successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-from rest_framework import generics, permissions
-from .models import CustomUser
-from .serializers import UserSerializer
 
+# ✅ Get All Users (duplicate of UserListView, but more explicit endpoint)
 class AllUsersListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if you want to restrict
+    permission_classes = [permissions.AllowAny]
