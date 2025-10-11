@@ -1,6 +1,6 @@
+# posts/models.py
 from django.db import models
 from django.conf import settings
-
 
 class Post(models.Model):
     author = models.ForeignKey(
@@ -9,7 +9,7 @@ class Post(models.Model):
         related_name="posts"
     )
     content = models.TextField()
-    media = models.FileField(upload_to="post_media/", blank=True, null=True)
+    media = models.FileField(upload_to="post_media/", blank=True, null=True)  # supports image/video
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -17,18 +17,12 @@ class Post(models.Model):
 
 
 class Like(models.Model):
-    """
-    Explicit join model for likes. Keep this model and do NOT also add a
-    liked_by = ManyToManyField(...) on Post at the same time to avoid migration conflicts.
-    Use this model in views/serializers to list likes:
-        Like.objects.filter(post=post)  or post.like_set.all()
-    """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE)  # no related_name — reverse is post.like_set
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="likes")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("user", "post")
+        unique_together = ("user", "post")  # prevent duplicate likes
         ordering = ["-created_at"]
 
     def __str__(self):
@@ -41,12 +35,15 @@ class Comment(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Keep comment likes as a ManyToMany - these are independent from the Post.like model
+    # ManyToMany for likes on comments (keeps queries simple)
     liked_by = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="liked_comments",
         blank=True
     )
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.user.username} commented on Post {self.post.id}"

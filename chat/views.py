@@ -1,17 +1,17 @@
-from rest_framework import generics, permissions, status
-from rest_framework.response import Response
+# chat/views.py
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
 
 from .models import ChatMessage
 from .serializers import ChatMessageSerializer
 from users.models import CustomUser
 
-
 class ChatListView(generics.ListAPIView):
     """
-    List all chat messages between the authenticated user and another user.
-    URL should provide `user_id` (the other user's id).
+    List messages between the authenticated user and another user (user_id in URL).
+    Example: GET /api/chat/<user_id>/
     """
     serializer_class = ChatMessageSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -19,36 +19,55 @@ class ChatListView(generics.ListAPIView):
     def get_queryset(self):
         other_id = self.kwargs.get('user_id')
         user = self.request.user
-        other_user = get_object_or_404(CustomUser, pk=other_id)
+        other_user = get_object_or_404(CustomUser, id=other_id)
         return ChatMessage.objects.filter(
             Q(sender=user, receiver=other_user) | Q(sender=other_user, receiver=user)
-        ).order_by('created_at')
+        ).order_by('timestamp')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update({'request': self.request})
+        return ctx
 
 
 class ChatCreateView(generics.CreateAPIView):
     """
-    Create a chat message. Receiver can be passed either in URL as `user_id`
-    or in request body as `"receiver": <id>`.
-    The view ensures we pass a CustomUser instance to serializer.save(...)
+    Create a chat message.
+    - Preferred URL: POST /api/chat/<user_id>/send/  (user_id = receiver id)
+    - Or POST /api/chat/send/ with body {'receiver_id': <id>, 'message': '...'}
+    The authenticated user is set as the sender automatically.
     """
     serializer_class = ChatMessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def perform_create(self, serializer):
+        request = self.request
+        # Try to get receiver from URL kwarg 'user_id'
+        receiver = None
+        user_id = self.kwargs.get('user_id')
+        if user_id:
+            receiver = get_object_or_404(CustomUser, id=int(user_id))
+
+        # If receiver not provided via URL, the serializer may have a validated 'receiver'
+        validated_receiver = serializer.validated_data.get('receiver') if hasattr(serializer, 'validated_data') else None
+
+        if not receiver and validated_receiver:
+            receiver = validated_receiver
+
+        if receiver:
+            serializer.save(sender=request.user, receiver=receiver)
+        else:
+            # Let serializer raise validation error (e.g. receiver_id missing)
+            serializer.save(sender=request.user)
+
     def create(self, request, *args, **kwargs):
-        # prefer URL param first, then body
-        receiver_id = self.kwargs.get('user_id') or request.data.get('receiver')
-        if receiver_id is None:
-            return Response({"error": "Missing receiver id."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Ensure we have an integer id (or convertible string)
-        try:
-            receiver = get_object_or_404(CustomUser, pk=int(receiver_id))
-        except (ValueError, TypeError):
-            return Response({"error": "Invalid receiver id."}, status=status.HTTP_400_BAD_REQUEST)
-
+        """
+        Override to ensure we call serializer.is_valid() prior to perform_create,
+        so that `perform_create` can rely on serializer.validated_data if necessary.
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # pass real CustomUser instance to serializer.save
-        serializer.save(sender=self.request.user, receiver=receiver)
+        self.perform_create(serializer)
+        # use the same header behavior as CreateAPIView
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

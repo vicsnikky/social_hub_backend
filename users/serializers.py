@@ -1,20 +1,14 @@
 # users/serializers.py
-from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth import get_user_model, authenticate
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
-from rest_framework import serializers
 from django.contrib.auth.tokens import default_token_generator
+from rest_framework import serializers
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """
-    Full user serializer used for responses and signup/update.
-    - exposes `password` as write_only for signup/update
-    - returns absolute avatar URL (uses `profile_pic` on your CustomUser)
-    """
     avatar = serializers.SerializerMethodField(read_only=True)
     password = serializers.CharField(write_only=True, required=False, min_length=6)
 
@@ -36,12 +30,14 @@ class UserSerializer(serializers.ModelSerializer):
     def get_avatar(self, obj):
         request = self.context.get("request")
         pic = getattr(obj, "profile_pic", None)
-        if pic:
-            try:
-                return request.build_absolute_uri(pic.url) if request else pic.url
-            except Exception:
-                return getattr(pic, "url", None)
-        return None
+        if not pic:
+            return None
+        url = getattr(pic, "url", None)
+        if not url:
+            return None
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
@@ -49,14 +45,14 @@ class UserSerializer(serializers.ModelSerializer):
         if password:
             user.set_password(password)
         else:
-            user.password = make_password(None)
+            user.set_unusable_password()
         user.save()
         return user
 
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)
-        for attr, val in validated_data.items():
-            setattr(instance, attr, val)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
         if password:
             instance.set_password(password)
         instance.save()
@@ -64,19 +60,28 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    """
-    Simple login serializer used by the login view.
-    Accepts username OR email in `username` field (keeps view logic simple).
-    """
     username = serializers.CharField(required=True, help_text="username or email")
     password = serializers.CharField(write_only=True, required=True)
 
+    def validate(self, data):
+        username = data.get("username")
+        password = data.get("password")
+        # Let the view handle whether username is email or username string.
+        user = authenticate(username=username, password=password)
+        if user is None:
+            # Try finding by email if authenticate with username failed (some setups)
+            try:
+                user_obj = User.objects.get(email=username)
+            except User.DoesNotExist:
+                raise serializers.ValidationError("Invalid credentials")
+            user = authenticate(username=user_obj.username, password=password)
+            if user is None:
+                raise serializers.ValidationError("Invalid credentials")
+        data["user"] = user
+        return data
+
 
 class PasswordResetRequestSerializer(serializers.Serializer):
-    """
-    Request a reset link (sends email in your implementation).
-    This is a light-weight serializer that validates email exists.
-    """
     email = serializers.EmailField()
 
     def validate_email(self, value):
@@ -85,27 +90,19 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         return value
 
     def save(self, **kwargs):
-        """
-        Build uid & token for the user and return the reset link string.
-        You'll want to actually email this in production.
-        """
         email = self.validated_data["email"]
         user = User.objects.get(email=email)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        # FRONTEND_BASE_URL should be in settings
         from django.conf import settings
         frontend = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:3000")
         reset_link = f"{frontend}/reset-password/{uid}/{token}"
-        # Optionally: send email here using send_mail()
+        # In production send email with reset_link
         return {"reset_link": reset_link, "uid": uid, "token": token}
 
 
 class PasswordResetSerializer(serializers.Serializer):
-    """
-    Token-less password reset (for your simple endpoint that just accepts email + new_password).
-    If you instead use uid+token flow, use PasswordResetConfirmSerializer below.
-    """
+    # token-less reset (email + new_password)
     email = serializers.EmailField()
     new_password = serializers.CharField(write_only=True, min_length=6)
 
@@ -124,10 +121,6 @@ class PasswordResetSerializer(serializers.Serializer):
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    """
-    If you implement the uid+token reset view, use this serializer.
-    Expected fields: uid, token, new_password
-    """
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(write_only=True, min_length=6)
